@@ -95,7 +95,7 @@ The dialog does not show agent statuses (working, blocked, done, idle). It only 
 
 **Keys on the Review screen:** `y` or `enter` installs. `o` opens the repo. `esc`, `n` or `q` cancel.
 
-**Keys in a Confirm banner:** `y` or `enter` mean yes. `n` or `esc` mean no, which shows `Cancelled.`
+**Keys in a Confirm banner:** only `y` means yes. `enter` does nothing there: it is the list's Ask AI key, so `x` followed by a habitual `enter` must not remove a mod. `n` or `esc` mean no, which shows `Cancelled.`
 
 While the dialog is busy, it ignores keys. While a text box has focus, `esc` leaves the box.
 

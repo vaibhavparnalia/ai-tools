@@ -415,7 +415,8 @@ export default class ModManager extends View {
     const k = e.key;
     const ch = e.key_char ?? k;
     if (this.confirm) {
-      if (k === "y" || k === "enter") this.answer(cx, true);
+      // y only: Enter is the list's "ask AI" key, so x then Enter must not delete a mod.
+      if (k === "y") this.answer(cx, true);
       else if (k === "n" || k === "escape") this.answer(cx, false);
       else return;
       cx.stop_propagation();
