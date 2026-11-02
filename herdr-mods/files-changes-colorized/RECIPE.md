@@ -40,7 +40,7 @@ At the bottom, a commit-message field and 32px-high Commit button sit inside a 1
 RECIPE.md
 preview.png
 mods/
-  files-colors/
+  file-changes-colors/
     main.js
     mod.json
     appearance.js
@@ -89,7 +89,7 @@ Copy either or both mod folders into the person's Herdr `mods/` directory. If a 
 
 ## Done when
 
-1. `herdr-app check mods/files-colors` and `herdr-app check mods/changes-colors` both exit zero; after opening them, `herdr-app status` reports no mod errors. For this build, checked on Herdr 0.1.9.
+1. `herdr-app check mods/file-changes-colors` and `herdr-app check mods/changes-colors` both exit zero; after opening them, `herdr-app status` reports no mod errors. For this build, checked on Herdr 0.1.9.
 2. A real sample repository shows distinct source/config/Markdown icons and named closed folder icons in their original colors, green added filenames, amber modified filenames and red deleted filenames in Changes. Unknown extensions get Charmed's default file icon. Folder helper tests cover closed/open variants; asset tests check SVG palettes and attribution. Helper tests cover magenta conflicts and conflict precedence without modifying the person's repositories.
 3. Expanding folders lists children; selecting a readable source file constructs a readonly native editor with syntax colors; returning to the tree works. Binary/unavailable content gets an explanatory message. Diff selection shows green additions/red deletions, line numbers and unchanged context; an empty diff does not crash the checker.
 4. `node tests/appearance.test.mjs`, `node tests/empty-diff.test.mjs` and `node tests/file-preview.test.mjs` pass. Check commit behavior only in a disposable repository: the implemented action stages everything and commits the supplied message. This build did not execute the UI commit action against a real work repository.

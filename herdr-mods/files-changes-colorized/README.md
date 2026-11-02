@@ -15,7 +15,7 @@ Ask your agent to read [RECIPE.md](RECIPE.md), then install either or both folde
 Tested with Herdr 0.1.9:
 
 ```sh
-herdr-app check mods/files-colors
+herdr-app check mods/file-changes-colors
 herdr-app check mods/changes-colors
 node tests/appearance.test.mjs
 node tests/empty-diff.test.mjs

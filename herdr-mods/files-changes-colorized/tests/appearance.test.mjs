@@ -12,7 +12,7 @@ const files = {
   'unknown.xyz': '_file', 'no-extension': '_file', 'tsconfig.json': 'typescript-config',
   'src/deep/file.ts': 'typescript', 'src/thing.d.ts': 'typescript-def',
 };
-for (const name of ['files-colors', 'changes-colors']) {
+for (const name of ['file-changes-colors', 'changes-colors']) {
   const source = await readFile(new URL(`../mods/${name}/appearance.js`, import.meta.url), 'utf8');
   const { fileAppearance, folderAppearance, statusColor, gitStatus } = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
   for (const [path, icon] of Object.entries(files)) {
@@ -21,7 +21,7 @@ for (const name of ['files-colors', 'changes-colors']) {
     assert.match(svg, /<svg/);
     assert.match(svg, /#[0-9a-fA-F]{3,8}/, 'Icon must retain its original palette');
   }
-  if (name === 'files-colors') {
+  if (name === 'file-changes-colors') {
     for (const [folder, icon] of Object.entries({ src: 'folder_source', components: 'folder_component', tests: 'folder_test', docs: 'folder_docs', assets: 'folder_assets', config: 'folder_config', scripts: 'folder_script', custom: '_folder' })) {
       assert.equal(folderAppearance(`project/${folder}`, false), icon);
       assert.equal(folderAppearance(`project/${folder}`, true), `${icon}_open`);

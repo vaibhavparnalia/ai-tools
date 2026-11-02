@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const source = await readFile(new URL('../mods/files-colors/main.js', import.meta.url), 'utf8');
+const source = await readFile(new URL('../mods/file-changes-colors/main.js', import.meta.url), 'utf8');
 let content = 'export const message = "hello";', editor;
 const colors = { ansi5: '#ff00ff', ansi2: '#00ff00', dim: '#555555', ansi4: '#0000ff', ansi3: '#ffff00', ansi1: '#ff0000', ansi6: '#00ffff' };
 const dependencies = {
