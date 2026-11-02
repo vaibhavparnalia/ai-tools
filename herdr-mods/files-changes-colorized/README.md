@@ -1,6 +1,6 @@
 # File Changes Colorized
 
-Separate **Files** and **Changes** panels with colored Charmed file/folder icons, Git status-colored filenames, syntax-highlighted file previews and green/red unified diffs. Changes keeps its file list and diff in separate bordered containers.
+Separate **Files** and **Changes** panels with colored Charmed file/folder icons, Git status-colored filenames, syntax-highlighted file previews and green/red unified diffs, and a Git row (Fetch, Pull, Push, Stash, Pop) with ↓/↑ counts. Changes keeps its file list and diff in separate bordered containers.
 
 ![File Changes Colorized](preview.png)
 
@@ -8,7 +8,7 @@ Separate **Files** and **Changes** panels with colored Charmed file/folder icons
 
 Ask your agent to read [RECIPE.md](RECIPE.md), then install either or both folders from `mods/` into `~/.config/herdr-app/mods/`. Do not overwrite an existing mod name. Each panel docks independently on first discovery; no layout or keys file is needed. The installed Files and Changes panels and their toolbar buttons stay untouched.
 
-**Access:** reads the focused folder and runs Git plus shell/PowerShell commands. **Changes' Commit action stages every change with `git add -A` before committing.** It does not push. Review the recipe before installing.
+**Access:** reads the focused folder and runs Git plus shell/PowerShell commands. **Changes' Commit action stages every change with `git add -A` before committing.** Its Git row runs `git fetch`, `git pull --ff-only`, `git push`, `git stash` and `git stash pop` when you click them, which reaches your remote. Review the recipe before installing.
 
 ## Verify
 
@@ -20,6 +20,7 @@ herdr-app check mods/changes-colors
 node tests/appearance.test.mjs
 node tests/empty-diff.test.mjs
 node tests/file-preview.test.mjs
+node tests/git-row.test.mjs
 ```
 
 Files uses Herdr's native syntax-highlighting editor. Changes highlights additions/deletions, not individual source tokens. Windows and remote-machine behavior were not tested. The real UI commit action was not exercised.

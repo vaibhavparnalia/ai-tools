@@ -1,4 +1,4 @@
-import { View, div, image } from "gpui-kit";
+import { View, div, image, svg } from "gpui-kit";
 import { fileAppearance, gitStatus, statusColor } from "./appearance.js";
 import { v_flex, h_flex, InputState, Input, Scrollbar, v_virtual_list } from "gpui-base";
 import { spaces, panes, focused, exec, readTextFile, watchFolder, theme, settings } from "herdr";
@@ -62,7 +62,7 @@ export default class Changes extends View {
     if (this.loading || this.busy) return;
     const { cwd, on } = location(), context = key();
     if (context !== this.context) {
-      this.context = context; this.root = null; this.files = []; this.open = null;
+      this.context = context; this.root = null; this.files = []; this.open = null; this.sync = null;
       this.setLines([]); this.message = ""; this.input.set_value(""); this.error = null; this.note = null; this.watched = null; this.closed = false; this.limited = false;
     }
     if (!cwd) return;
@@ -71,7 +71,7 @@ export default class Changes extends View {
       try {
         const top = await exec("git", ["rev-parse", "--show-toplevel"], { cwd, on });
         if (key() !== context) return;
-        if (top.code !== 0) { this.root = null; this.files = []; this.setLines([]); this.open = null; this.error = "Not a git repository"; return; }
+        if (top.code !== 0) { this.root = null; this.files = []; this.sync = null; this.setLines([]); this.open = null; this.error = "Not a git repository"; return; }
         const root = top.stdout.trim(), git = (args) => exec("git", [...READ, ...args], { cwd: root, on });
         const status = await git(["status", "--porcelain=v1", "-z", "--no-renames", "--untracked-files=all"]);
         if (status.code !== 0) throw new Error(status.stderr);
@@ -87,6 +87,13 @@ export default class Changes extends View {
             stats[path] = { add: old.add + (Number(a) || 0), del: old.del + (Number(d) || 0), binary: a === "-" };
           }
         }
+        const [branch, counts, stashes] = await Promise.all([
+          git(["symbolic-ref", "--short", "-q", "HEAD"]),
+          git(["rev-list", "--left-right", "--count", "@{upstream}...HEAD"]),
+          git(["stash", "list"]),
+        ]);
+        const [behind, ahead] = counts.code === 0 ? counts.stdout.trim().split(/\s+/).map(Number) : [0, 0];
+        const sync = { branch: branch.code === 0 ? branch.stdout.trim() : "detached HEAD", upstream: counts.code === 0, behind, ahead, stashes: stashes.stdout.split("\n").filter(Boolean).length };
         const files = [];
         const entries = status.stdout.split("\0").filter(Boolean);
         for (const entry of entries.slice(0, 1000)) {
@@ -96,7 +103,7 @@ export default class Changes extends View {
           files.push({ path, status: s, fresh, ...stat });
         }
         if (key() !== context) return;
-        this.root = root; this.on = on; this.hasHead = head.code === 0; this.files = files; this.limited = entries.length > 1000; this.error = null;
+        this.root = root; this.on = on; this.hasHead = head.code === 0; this.files = files; this.sync = sync; this.limited = entries.length > 1000; this.error = null;
         this.watch(root, cx);
         if (this.open && !files.some((f) => f.path === this.open)) { this.open = null; this.setLines([]); }
         // The first file's diff shows until you pick another.
@@ -149,20 +156,56 @@ export default class Changes extends View {
   }
 
   commit(cx) {
-    if (!this.message.trim() || !this.root || this.busy || this.loading || this.context !== key()) return;
-    const root = this.root, on = this.on, context = this.context, message = this.message.trim();
-    this.busy = true; this.note = null;
+    if (!this.message.trim()) return;
+    const message = this.message.trim();
+    this.git(cx, "Commit", [["add", "-A"], ["commit", "-m", message]], () => { this.message = ""; this.input.set_value(""); });
+  }
+
+  // Runs git commands in order for one button; the first failure stops the rest and shows in the note.
+  git(cx, name, steps, done) {
+    if (!this.root || this.busy || this.loading || this.context !== key()) return;
+    const root = this.root, on = this.on, context = this.context;
+    this.busy = name; this.note = null;
     cx.spawn(async (cx) => {
       try {
-        for (const args of [["add", "-A"], ["commit", "-m", message]]) {
+        for (const args of steps) {
           const r = await exec("git", args, { cwd: root, on });
           if (r.code !== 0) throw new Error((r.stderr || r.stdout).trim());
         }
-        if (key() === context) { this.message = ""; this.input.set_value(""); }
-      } catch (e) { if (key() === context) this.note = `Commit failed: ${e}`; }
+        if (key() === context) done?.();
+      } catch (e) { if (key() === context) this.note = `${name} failed: ${e.message ?? e}`; }
       finally { this.busy = false; this.refresh(cx); cx.notify(); }
     });
     cx.notify();
+  }
+
+  push(cx) {
+    const s = this.sync;
+    this.git(cx, "Push", [s?.upstream ? ["push"] : ["push", "-u", "origin", "HEAD"]]);
+  }
+
+  syncButton(t, name, icon, tip, onClick, { enabled = true, count = 0, arrow = "", color } = {}) {
+    const on = enabled && Boolean(this.root) && !this.busy && !this.loading;
+    return h_flex().id(`git-${name}`).h(28).px(7).gap(4).items_center().flex_none().rounded(7).border_1()
+      .border_color(count > 0 ? color : t.border).bg(count > 0 ? color + "1f" : t.background)
+      .tooltip(tip).accessibility_label(count > 0 ? `${tip}, ${count} ${arrow === "↓" ? "behind" : "ahead"}` : tip)
+      .when(on, (e) => e.cursor_pointer().hover((s) => s.bg(t.hover)).on_click((_e, cx) => onClick(cx)))
+      .when(!on, (e) => e.opacity(0.45))
+      .child(svg(`mods/changes-colors/${icon}.svg`).size(14).text_color(count > 0 ? color : t.foreground))
+      .when(count > 0, (e) => e.child(div().text_size(11).font_semibold().text_color(color).child(`${arrow}${count}`)))
+      .when(this.busy === name, (e) => e.child(div().text_size(11).text_color(t.muted).child("…")));
+  }
+
+  syncRow(t) {
+    const s = this.sync;
+    return h_flex().h(40).flex_none().px(10).gap(6).items_center().border_b(1).border_color(t.border)
+      .child(svg("mods/changes-colors/branch.svg").size(14).flex_none().text_color(t.muted))
+      .child(div().flex_1().min_w(0).truncate().text_size(12).text_color(t.muted).child(s ? `${s.branch}${s.upstream ? "" : " · no upstream"}` : ""))
+      .child(this.syncButton(t, "Fetch", "fetch", "Fetch from remote", (cx) => this.git(cx, "Fetch", [["fetch", "--prune"]])))
+      .child(this.syncButton(t, "Pull", "pull", "Pull (fast-forward only)", (cx) => this.git(cx, "Pull", [["pull", "--ff-only"]]), { enabled: Boolean(s?.upstream), count: s?.behind, arrow: "↓", color: t.ansi3 }))
+      .child(this.syncButton(t, "Push", "push", s?.upstream ? "Push commits" : "Push and set upstream to origin", (cx) => this.push(cx), { enabled: s?.branch !== "detached HEAD", count: s?.ahead, arrow: "↑", color: t.ansi4 }))
+      .child(this.syncButton(t, "Stash", "stash", "Stash all changes", (cx) => this.git(cx, "Stash", [["stash", "push", "-u"]]), { enabled: this.files.length > 0 }))
+      .child(this.syncButton(t, "Pop", "unstash", s?.stashes ? `Pop latest stash (${s.stashes} saved)` : "Pop stash (none saved)", (cx) => this.git(cx, "Pop", [["stash", "pop"]]), { enabled: Boolean(s?.stashes) }));
   }
 
   diffRow({ kind, number, text }, t) {
@@ -184,6 +227,7 @@ export default class Changes extends View {
         .child(div().font_semibold().child("Changes"))
         .child(div().px(5).py(1).rounded(4).border_1().border_color(t.border).text_size(10).text_color(t.muted).child(`${this.files.length} files`))
         .child(div().flex_1()).child(div().text_size(11).text_color(t.ansi2).child(`+${add}`)).child(div().text_size(11).text_color(t.ansi1).child(`−${del}`)))
+      .when(Boolean(this.root), (e) => e.child(this.syncRow(t)))
       .child(v_flex().flex_1().min_h(0).p(8).gap(8)
         .child(v_flex().id("changes-list").flex_none().h(Math.min(200, Math.max(44, this.files.length * 28 + 12))).overflow_y_scrollbar().p(6).rounded(8).border_1().border_color(t.border).bg(t.chrome).children(this.files.map((f) => {
           const parts = f.path.split("/"), name = parts.pop();
@@ -204,6 +248,6 @@ export default class Changes extends View {
       .when(Boolean(this.note), (e) => e.child(div().px(10).pb(8).text_size(11).text_color(t.ansi1).child(this.note)))
       .child(h_flex().flex_none().p(10).gap(8).border_t(1).border_color(t.border)
         .child(div().id("commit-message").flex_1().min_w(0).h(32).px(10).flex().items_center().rounded(8).border_1().border_color(this.typing ? t.accent : t.border).cursor_text().on_mouse_down("left", (_e, cx) => cx.stop_propagation()).child(Input.new(this.input).h_full().text_size(12).text_color(t.foreground)))
-        .child(div().id("commit").h(32).px(14).flex().items_center().rounded(8).bg(enabled ? t.solid : t.raised).text_color(enabled ? t.solid_foreground : t.dim).text_size(12).when(enabled, (e) => e.cursor_pointer()).on_click((_e, cx) => this.commit(cx)).child(this.busy ? "Committing…" : "Commit")));
+        .child(div().id("commit").h(32).px(14).flex().items_center().rounded(8).bg(enabled ? t.solid : t.raised).text_color(enabled ? t.solid_foreground : t.dim).text_size(12).when(enabled, (e) => e.cursor_pointer()).on_click((_e, cx) => this.commit(cx)).child(this.busy === "Commit" ? "Committing…" : "Commit")));
   }
 }
